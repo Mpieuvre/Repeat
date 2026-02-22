@@ -1,0 +1,27 @@
+name: Repeat
+version: 2.0.0
+main: fr.mpieuvre.repeat.Main
+api-version: '1.21'
+author: Mpieuvre
+description: Configurable automatic message plugin.
+commands:
+  setmessage:
+    description: Sets the automatic message.
+    usage: /setmessage <message>
+    permission: repeat.admin
+  togglemessage:
+    description: Enables or disables automatic messages.
+    usage: /togglemessage
+    permission: repeat.admin
+  setinterval:
+    description: Sets the interval between automatic messages (in seconds).
+    usage: /setinterval <seconds>
+    permission: repeat.admin
+  repeathelp:
+    description: Shows Repeat help.
+    usage: /repeathelp
+    permission: repeat.admin
+permissions:
+  repeat.admin:
+    description: Allows full Repeat plugin configuration.
+    default: op

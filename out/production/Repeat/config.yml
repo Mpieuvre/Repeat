@@ -1,0 +1,3 @@
+autoMessage: "&6[Repeat] &fEdit this message with /setmessage <message>"
+enabled: true
+intervalSeconds: 300

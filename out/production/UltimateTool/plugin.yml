@@ -1,0 +1,15 @@
+name: UltimateTool
+version: 1.0
+author: Mpieuvre
+main: fr.mpieuvre.ultimatetool.Main
+commands:
+  setmessage:
+    description: Change the automatic message
+    usage: /setmessage <message>
+  togglemessage:
+    description: Enables or disables the automatic message
+    usage: /togglemessage
+permissions:
+  ultimatetool.admin:
+    description: Permission to manage the automatic message
+    default: op
