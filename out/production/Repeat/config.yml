@@ -1,3 +1,49 @@
-autoMessage: "&6[Repeat] &fEdit this message with /setmessage <message>"
+# Repeat - configuration
+#
+# Color codes:
+# - Standard: &0..&9, &a..&f
+# - Formats: &k (obfuscated), &l (bold), &m (strikethrough), &n (underline), &o (italic), &r (reset)
+# - Hex: &#RRGGBB (example: &#ff00ff)
+#
+# Placeholders (resolved per player):
+# - {online}  current online player count
+# - {max}     server max players
+# - {player}  receiving player's name
+# - {world}   receiving player's world name
+# - {server}  server name
+#
+# Messages rotation:
+# - The plugin cycles through entries in order.
+# - Each entry can have its own intervalSeconds, delivery mode and world filter.
+
 enabled: true
+
+# Default interval (in seconds) used when an entry doesn't specify one.
 intervalSeconds: 300
+
+# Minimum online players required before any message is broadcast (0 = always).
+minPlayers: 0
+
+# When true, only players with repeat.receive permission get messages.
+requireReceivePermission: false
+
+# Index of the next message to send (0-based). Usually you shouldn't edit this manually.
+nextMessageIndex: 0
+
+# Preferred format (nice + clear)
+entries:
+  - message: "&6[Repeat] &fEdit this message with /setmessage <message>"
+    intervalSeconds: 300
+    delivery: chat
+    # worlds: [world, world_nether]
+  # - message: "&a{online}/{max} players online &7- &fVisit our website!"
+  #   intervalSeconds: 120
+  #   delivery: action_bar
+  #   worlds: [world]
+
+# Legacy keys (still supported on load). The plugin will save using the entries format.
+# messages:
+#   - "&6[Repeat] &fEdit this message with /setmessage <message>"
+# messageIntervals:
+#   - 300
+# autoMessage: "&6[Repeat] &fEdit this message with /setmessage <message>"

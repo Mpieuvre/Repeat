@@ -1,21 +1,70 @@
 name: Repeat
-version: 2.0.0
+version: 2.1.0
 main: fr.mpieuvre.repeat.Main
 api-version: '1.21'
 author: Mpieuvre
-description: Configurable automatic message plugin.
+description: Configurable automatic message plugin with rotation, placeholders and delivery modes.
 commands:
   setmessage:
     description: Sets the automatic message.
-    usage: /setmessage <message>
+    usage: /setmessage <message> OR /setmessage <index> <message>
+    permission: repeat.admin
+  addmessages:
+    description: Adds a message to the automatic rotation.
+    usage: /addmessages <message>
+    aliases: [addmessage]
+    permission: repeat.admin
+  removemessage:
+    description: Removes a message from the rotation.
+    usage: /removemessage <index>
+    permission: repeat.admin
+  clearmessages:
+    description: Deletes all configured messages.
+    usage: /clearmessages confirm
+    permission: repeat.admin
+  movemessage:
+    description: Moves a message to another position in the rotation.
+    usage: /movemessage <from> <to>
+    permission: repeat.admin
+  testmessage:
+    description: Sends the next scheduled message only to you.
+    usage: /testmessage
+    permission: repeat.admin
+  testemessages:
+    description: Sends one specific saved message to you.
+    usage: /testemessages <index>
+    permission: repeat.admin
+  listemessage:
+    description: Lists all saved messages with indexes.
+    usage: /listemessage
+    permission: repeat.admin
+  repeatreload:
+    description: Reloads Repeat configuration from file.
+    usage: /repeatreload
     permission: repeat.admin
   togglemessage:
     description: Enables or disables automatic messages.
     usage: /togglemessage
     permission: repeat.admin
   setinterval:
-    description: Sets the interval between automatic messages (in seconds).
-    usage: /setinterval <seconds>
+    description: Sets the interval for all messages, or for one specific message.
+    usage: /setinterval <seconds> OR /setinterval <index> <seconds>
+    permission: repeat.admin
+  setdelivery:
+    description: Sets the delivery mode for all messages or one message.
+    usage: /setdelivery <chat|actionbar> OR /setdelivery <index> <chat|actionbar>
+    permission: repeat.admin
+  setworlds:
+    description: Limits message delivery to specific worlds.
+    usage: /setworlds all OR /setworlds <world1,world2,...>
+    permission: repeat.admin
+  setminplayers:
+    description: Sets the minimum online players required to broadcast.
+    usage: /setminplayers <count>
+    permission: repeat.admin
+  repeatstatus:
+    description: Shows the current Repeat plugin status.
+    usage: /repeatstatus
     permission: repeat.admin
   repeathelp:
     description: Shows Repeat help.
@@ -25,3 +74,6 @@ permissions:
   repeat.admin:
     description: Allows full Repeat plugin configuration.
     default: op
+  repeat.receive:
+    description: Allows receiving automatic Repeat messages when requireReceivePermission is enabled.
+    default: true
