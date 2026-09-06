@@ -1,4 +1,4 @@
-# Repeat - configuration
+# Repeat 3.0 - configuration
 #
 # Color codes:
 # - Standard: &0..&9, &a..&f
@@ -12,9 +12,21 @@
 # - {world}   receiving player's world name
 # - {server}  server name
 #
-# Messages rotation:
-# - The plugin cycles through entries in order.
-# - Each entry can have its own intervalSeconds, delivery mode and world filter.
+# Delivery modes:
+# - chat
+# - action_bar
+# - boss_bar
+#
+# Bossbar:
+# - The bar stays on screen and empties over durationSeconds.
+# - When it is empty, Repeat switches to the next bossbar message.
+# - If there is only one bossbar message, it loops forever and the progress restarts.
+# - color: pink, blue, red, green, yellow, purple, white
+# - style: solid, segmented_6, segmented_10, segmented_12, segmented_20
+# - durationSeconds: time to empty the bar before the next message
+#
+# Commands:
+# - /repeat help
 
 enabled: true
 
@@ -30,20 +42,19 @@ requireReceivePermission: false
 # Index of the next message to send (0-based). Usually you shouldn't edit this manually.
 nextMessageIndex: 0
 
-# Preferred format (nice + clear)
 entries:
-  - message: "&6[Repeat] &fEdit this message with /setmessage <message>"
+  - message: "&6[Repeat] &fUse &e/repeathelp &ffor help and to configure the plugin."
     intervalSeconds: 300
     delivery: chat
-    # worlds: [world, world_nether]
-  # - message: "&a{online}/{max} players online &7- &fVisit our website!"
+  # - message: "&a{online}/{max} players online &7- &fWelcome {player}!"
   #   intervalSeconds: 120
   #   delivery: action_bar
   #   worlds: [world]
-
-# Legacy keys (still supported on load). The plugin will save using the entries format.
-# messages:
-#   - "&6[Repeat] &fEdit this message with /setmessage <message>"
-# messageIntervals:
-#   - 300
-# autoMessage: "&6[Repeat] &fEdit this message with /setmessage <message>"
+  # - message: "&eServer restart in 10 minutes"
+  #   intervalSeconds: 180
+  #   delivery: boss_bar
+  #   bossbar:
+  #     color: yellow
+  #     style: solid
+  #     durationSeconds: 8
+  #     progress: 1.0

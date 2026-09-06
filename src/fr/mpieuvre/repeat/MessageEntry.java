@@ -11,16 +11,24 @@ public final class MessageEntry {
     private long intervalSeconds;
     private DeliveryMode deliveryMode;
     private List<String> worlds;
+    private BossBarSettings bossBarSettings;
 
     public MessageEntry(String message, long intervalSeconds) {
-        this(message, intervalSeconds, DeliveryMode.CHAT, Collections.emptyList());
+        this(message, intervalSeconds, DeliveryMode.CHAT, Collections.emptyList(), new BossBarSettings());
     }
 
-    public MessageEntry(String message, long intervalSeconds, DeliveryMode deliveryMode, List<String> worlds) {
+    public MessageEntry(
+            String message,
+            long intervalSeconds,
+            DeliveryMode deliveryMode,
+            List<String> worlds,
+            BossBarSettings bossBarSettings
+    ) {
         this.message = message == null ? "" : message.trim();
         this.intervalSeconds = Math.max(1L, intervalSeconds);
         this.deliveryMode = deliveryMode == null ? DeliveryMode.CHAT : deliveryMode;
         this.worlds = normalizeWorlds(worlds);
+        this.bossBarSettings = bossBarSettings == null ? new BossBarSettings() : bossBarSettings.copy();
     }
 
     public String getMessage() {
@@ -55,11 +63,18 @@ public final class MessageEntry {
         this.worlds = normalizeWorlds(worlds);
     }
 
+    public BossBarSettings getBossBarSettings() {
+        return bossBarSettings;
+    }
+
+    public void setBossBarSettings(BossBarSettings bossBarSettings) {
+        this.bossBarSettings = bossBarSettings == null ? new BossBarSettings() : bossBarSettings.copy();
+    }
+
     public boolean appliesToWorld(String worldName) {
         if (worlds.isEmpty()) {
             return true;
         }
-
         for (String world : worlds) {
             if (world.equalsIgnoreCase(worldName)) {
                 return true;
@@ -72,15 +87,11 @@ public final class MessageEntry {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("message", message);
         map.put("intervalSeconds", intervalSeconds);
-
-        if (deliveryMode != DeliveryMode.CHAT) {
-            map.put("delivery", deliveryMode.configValue());
-        }
-
+        map.put("delivery", deliveryMode.configValue());
         if (!worlds.isEmpty()) {
             map.put("worlds", new ArrayList<>(worlds));
         }
-
+        map.put("bossbar", bossBarSettings.toConfigMap());
         return map;
     }
 
@@ -96,7 +107,7 @@ public final class MessageEntry {
             intervalSeconds = Math.max(1L, number.longValue());
         } else if (intervalObject instanceof String intervalText) {
             try {
-                intervalSeconds = Math.max(1L, Long.parseLong(intervalText));
+                intervalSeconds = Math.max(1L, Long.parseLong(intervalText.trim()));
             } catch (NumberFormatException ignored) {
                 // keep default
             }
@@ -119,18 +130,18 @@ public final class MessageEntry {
             }
         }
 
-        return new MessageEntry(message, intervalSeconds, deliveryMode, worlds);
+        BossBarSettings bossBarSettings = BossBarSettings.fromConfig(map.get("bossbar"));
+        return new MessageEntry(message, intervalSeconds, deliveryMode, worlds, bossBarSettings);
     }
 
     public MessageEntry copy() {
-        return new MessageEntry(message, intervalSeconds, deliveryMode, worlds);
+        return new MessageEntry(message, intervalSeconds, deliveryMode, worlds, bossBarSettings);
     }
 
     private static List<String> normalizeWorlds(List<String> source) {
         if (source == null || source.isEmpty()) {
             return new ArrayList<>();
         }
-
         List<String> normalized = new ArrayList<>();
         for (String world : source) {
             if (world != null && !world.isBlank()) {
@@ -148,6 +159,6 @@ public final class MessageEntry {
     }
 
     public static String formatDelivery(DeliveryMode mode) {
-        return mode == null ? DeliveryMode.CHAT.configValue() : mode.configValue().replace('_', '-');
+        return mode == null ? DeliveryMode.CHAT.displayName() : mode.displayName();
     }
 }

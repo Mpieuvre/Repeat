@@ -1,5 +1,6 @@
 package fr.mpieuvre.repeat;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.lang.reflect.Constructor;
@@ -8,19 +9,38 @@ import java.lang.reflect.Method;
 public final class MessageDelivery {
     private static final boolean ACTION_BAR_SUPPORTED = detectActionBarSupport();
 
-    private MessageDelivery() {
+    public void send(Player player, MessageEntry entry, String formattedMessage) {
+        switch (entry.getDeliveryMode()) {
+            case ACTION_BAR -> sendActionBar(player, formattedMessage);
+            case BOSS_BAR -> {
+                // Persistent animated bossbars are handled by BossBarManager.
+            }
+            default -> player.sendMessage(formattedMessage);
+        }
     }
 
-    public static void send(Player player, DeliveryMode mode, String formattedMessage) {
-        if (mode == DeliveryMode.ACTION_BAR && ACTION_BAR_SUPPORTED) {
-            if (sendActionBar(player, formattedMessage)) {
-                return;
-            }
+    public void preview(CommandSender sender, MessageEntry entry, String formattedMessage) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(formattedMessage);
+            return;
+        }
+
+        if (entry.getDeliveryMode() == DeliveryMode.CHAT) {
+            player.sendMessage(formattedMessage);
+            return;
+        }
+
+        send(player, entry, formattedMessage);
+    }
+
+    private static void sendActionBar(Player player, String formattedMessage) {
+        if (ACTION_BAR_SUPPORTED && sendActionBarInternal(player, formattedMessage)) {
+            return;
         }
         player.sendMessage(formattedMessage);
     }
 
-    private static boolean sendActionBar(Player player, String formattedMessage) {
+    private static boolean sendActionBarInternal(Player player, String formattedMessage) {
         try {
             Class<?> chatMessageTypeClass = Class.forName("net.md_5.bungee.api.ChatMessageType");
             Object actionBarType = Enum.valueOf(asEnumClass(chatMessageTypeClass), "ACTION_BAR");
@@ -33,7 +53,11 @@ public final class MessageDelivery {
             Object spigotPlayer = spigotMethod.invoke(player);
 
             Class<?> baseComponentClass = Class.forName("net.md_5.bungee.api.chat.BaseComponent");
-            Method sendMessageMethod = spigotPlayer.getClass().getMethod("sendMessage", chatMessageTypeClass, baseComponentClass);
+            Method sendMessageMethod = spigotPlayer.getClass().getMethod(
+                    "sendMessage",
+                    chatMessageTypeClass,
+                    baseComponentClass
+            );
             sendMessageMethod.invoke(spigotPlayer, actionBarType, textComponent);
             return true;
         } catch (Throwable ignored) {

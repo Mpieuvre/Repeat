@@ -15,7 +15,6 @@ public final class TextUtils {
         if (text == null || text.isEmpty()) {
             return text;
         }
-
         return ChatColor.translateAlternateColorCodes('&', translateHexColors(text));
     }
 
@@ -26,13 +25,11 @@ public final class TextUtils {
 
         while (matcher.find()) {
             out.append(input, lastEnd, matcher.start());
-
             String hex = matcher.group(1);
             out.append('\u00A7').append('x');
             for (int i = 0; i < hex.length(); i++) {
                 out.append('\u00A7').append(Character.toLowerCase(hex.charAt(i)));
             }
-
             lastEnd = matcher.end();
         }
 

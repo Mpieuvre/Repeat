@@ -1,6 +1,7 @@
 package fr.mpieuvre.repeat;
 
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -8,17 +9,20 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 public class Main extends JavaPlugin {
-    private static final String DEFAULT_MESSAGE = "&6[Repeat] &fEdit this message with /setmessage <message>";
+    private static final String DEFAULT_MESSAGE = "&6[Repeat] &fUse &e/repeathelp &ffor help and to configure the plugin.";
     private static final long DEFAULT_INTERVAL_SECONDS = 300L;
     private static final String CONFIG_ENTRIES = "entries";
 
     private final List<MessageEntry> entries = new ArrayList<>();
+    private final BossBarManager bossBarManager = new BossBarManager(this);
+    private final MessageDelivery messageDelivery = new MessageDelivery();
+
     private boolean messageEnabled = true;
     private long defaultIntervalSeconds = DEFAULT_INTERVAL_SECONDS;
     private int nextMessageIndex;
@@ -31,35 +35,44 @@ public class Main extends JavaPlugin {
         saveDefaultConfig();
         configureYamlOptions();
         loadPluginData();
+        Bukkit.getPluginManager().registerEvents(bossBarManager, this);
         registerCommands();
         startAutoMessageTask();
+        bossBarManager.start();
         getLogger().info("Repeat is enabled.");
     }
 
     @Override
     public void onDisable() {
         stopAutoMessageTask();
+        bossBarManager.stop();
         getLogger().info("Repeat is disabled.");
     }
 
     private void registerCommands() {
         RepeatCommand commandExecutor = new RepeatCommand(this);
-        bindCommand("setmessage", commandExecutor);
-        bindCommand("addmessages", commandExecutor);
-        bindCommand("removemessage", commandExecutor);
-        bindCommand("clearmessages", commandExecutor);
-        bindCommand("movemessage", commandExecutor);
-        bindCommand("testmessage", commandExecutor);
-        bindCommand("testemessages", commandExecutor);
-        bindCommand("listemessage", commandExecutor);
-        bindCommand("repeatreload", commandExecutor);
-        bindCommand("togglemessage", commandExecutor);
-        bindCommand("setinterval", commandExecutor);
-        bindCommand("setdelivery", commandExecutor);
-        bindCommand("setworlds", commandExecutor);
-        bindCommand("setminplayers", commandExecutor);
-        bindCommand("repeatstatus", commandExecutor);
-        bindCommand("repeathelp", commandExecutor);
+        for (String commandName : List.of(
+                "repeat",
+                "setmessage",
+                "addmessages",
+                "removemessage",
+                "clearmessages",
+                "movemessage",
+                "testmessage",
+                "testemessages",
+                "listemessage",
+                "repeatreload",
+                "togglemessage",
+                "setinterval",
+                "setdelivery",
+                "setworlds",
+                "setminplayers",
+                "setbossbar",
+                "repeatstatus",
+                "repeathelp"
+        )) {
+            bindCommand(commandName, commandExecutor);
+        }
     }
 
     private void bindCommand(String commandName, RepeatCommand executor) {
@@ -88,17 +101,22 @@ public class Main extends JavaPlugin {
                 broadcastCurrentEntry();
                 nextMessageIndex = (nextMessageIndex + 1) % entries.size();
             }
-
             scheduleNextBroadcast(getDelayTicksForCurrentIndex());
         }, Math.max(1L, delayTicks));
     }
 
-    private void broadcastCurrentEntry() {
-        if (Bukkit.getOnlinePlayers().size() < minPlayers) {
+    public void broadcastCurrentEntry() {
+        if (entries.isEmpty() || Bukkit.getOnlinePlayers().size() < minPlayers) {
             return;
         }
-
         MessageEntry entry = entries.get(nextMessageIndex);
+        if (entry.getDeliveryMode() == DeliveryMode.BOSS_BAR) {
+            return;
+        }
+        deliverToEligiblePlayers(entry);
+    }
+
+    public void deliverToEligiblePlayers(MessageEntry entry) {
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (requireReceivePermission && !player.hasPermission("repeat.receive")) {
                 continue;
@@ -106,15 +124,49 @@ public class Main extends JavaPlugin {
             if (!entry.appliesToWorld(player.getWorld().getName())) {
                 continue;
             }
-
-            String resolved = PlaceholderService.apply(entry.getMessage(), player);
-            deliver(player, entry.getDeliveryMode(), resolved);
+            deliverTo(player, entry);
         }
     }
 
-    private void deliver(Player player, DeliveryMode mode, String message) {
-        String formatted = TextUtils.colorize(message);
-        MessageDelivery.send(player, mode, formatted);
+    public void deliverTo(Player player, MessageEntry entry) {
+        String resolved = PlaceholderService.apply(entry.getMessage(), player);
+        messageDelivery.send(player, entry, TextUtils.colorize(resolved));
+    }
+
+    public void preview(CommandSender sender, MessageEntry entry) {
+        if (entry.getDeliveryMode() == DeliveryMode.BOSS_BAR) {
+            bossBarManager.jumpTo(entry);
+            if (!(sender instanceof Player)) {
+                sender.sendMessage(TextUtils.colorize(PlaceholderService.apply(entry.getMessage(), null)));
+            }
+            return;
+        }
+
+        Player context = sender instanceof Player player ? player : null;
+        String resolved = PlaceholderService.apply(entry.getMessage(), context);
+        String formatted = TextUtils.colorize(resolved);
+        messageDelivery.preview(sender, entry, formatted);
+    }
+
+    public List<MessageEntry> getBossBarEntries() {
+        List<MessageEntry> result = new ArrayList<>();
+        for (MessageEntry entry : entries) {
+            if (entry.getDeliveryMode() == DeliveryMode.BOSS_BAR) {
+                result.add(entry);
+            }
+        }
+        return result;
+    }
+
+    public boolean canReceive(Player player, MessageEntry entry) {
+        if (requireReceivePermission && !player.hasPermission("repeat.receive")) {
+            return false;
+        }
+        return entry.appliesToWorld(player.getWorld().getName());
+    }
+
+    public boolean hasEnoughPlayers() {
+        return Bukkit.getOnlinePlayers().size() >= minPlayers;
     }
 
     private long getDelayTicksForCurrentIndex() {
@@ -161,7 +213,6 @@ public class Main extends JavaPlugin {
         if (!loadFromEntries()) {
             loadFromLegacyKeys();
         }
-
         normalizeNextMessageIndex();
     }
 
@@ -176,7 +227,6 @@ public class Main extends JavaPlugin {
             if (!(item instanceof Map<?, ?> map)) {
                 continue;
             }
-
             MessageEntry entry = MessageEntry.fromConfigMap(map, defaultIntervalSeconds);
             if (entry != null) {
                 loaded.add(entry);
@@ -227,20 +277,17 @@ public class Main extends JavaPlugin {
                 }
             }
         }
-
         return result;
     }
 
     private void configureYamlOptions() {
         Object options = getConfig().options();
-
         try {
             Method indent = options.getClass().getMethod("indent", int.class);
             indent.invoke(options, 2);
         } catch (Throwable ignored) {
             // Not available on this server / API version.
         }
-
         try {
             Method parseComments = options.getClass().getMethod("parseComments", boolean.class);
             parseComments.invoke(options, true);
@@ -250,7 +297,7 @@ public class Main extends JavaPlugin {
     }
 
     private void normalizeNextMessageIndex() {
-        nextMessageIndex = getConfig().getInt("nextMessageIndex", 0);
+        nextMessageIndex = getConfig().getInt("nextMessageIndex", nextMessageIndex);
         if (entries.isEmpty() || nextMessageIndex < 0 || nextMessageIndex >= entries.size()) {
             nextMessageIndex = 0;
         }
@@ -260,13 +307,6 @@ public class Main extends JavaPlugin {
         reloadConfig();
         loadPluginData();
         startAutoMessageTask();
-    }
-
-    public String getNextMessageForPreview() {
-        if (entries.isEmpty()) {
-            return DEFAULT_MESSAGE;
-        }
-        return entries.get(nextMessageIndex).getMessage();
     }
 
     public MessageEntry getNextEntryForPreview() {
@@ -296,6 +336,10 @@ public class Main extends JavaPlugin {
         return entries.get(index).copy();
     }
 
+    public MessageEntry getLiveEntryAt(int index) {
+        return entries.get(index);
+    }
+
     public void setPrimaryMessage(String message) {
         String normalized = message.trim();
         if (entries.isEmpty()) {
@@ -311,7 +355,13 @@ public class Main extends JavaPlugin {
     }
 
     public void addMessage(String message) {
-        entries.add(new MessageEntry(message.trim(), defaultIntervalSeconds));
+        addMessage(message, DeliveryMode.CHAT);
+    }
+
+    public void addMessage(String message, DeliveryMode deliveryMode) {
+        MessageEntry entry = new MessageEntry(message.trim(), defaultIntervalSeconds);
+        entry.setDeliveryMode(deliveryMode);
+        entries.add(entry);
     }
 
     public boolean removeMessageAt(int index) {
@@ -348,7 +398,6 @@ public class Main extends JavaPlugin {
         } else if (fromIndex > nextMessageIndex && toIndex <= nextMessageIndex) {
             nextMessageIndex++;
         }
-
         return true;
     }
 
@@ -362,10 +411,6 @@ public class Main extends JavaPlugin {
 
     public long getDefaultIntervalSeconds() {
         return defaultIntervalSeconds;
-    }
-
-    public long getIntervalSecondsAt(int index) {
-        return entries.get(index).getIntervalSeconds();
     }
 
     public void setDefaultIntervalSeconds(long intervalSeconds) {
@@ -404,6 +449,16 @@ public class Main extends JavaPlugin {
         entries.get(index).setWorlds(worlds);
     }
 
+    public void updateBossBarForAll(Consumer<BossBarSettings> updater) {
+        for (MessageEntry entry : entries) {
+            updater.accept(entry.getBossBarSettings());
+        }
+    }
+
+    public void updateBossBarAt(int index, Consumer<BossBarSettings> updater) {
+        updater.accept(entries.get(index).getBossBarSettings());
+    }
+
     public int getMinPlayers() {
         return minPlayers;
     }
@@ -419,5 +474,4 @@ public class Main extends JavaPlugin {
     public void setRequireReceivePermission(boolean requireReceivePermission) {
         this.requireReceivePermission = requireReceivePermission;
     }
-
 }

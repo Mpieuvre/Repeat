@@ -1,74 +1,83 @@
 name: Repeat
-version: 2.1.0
+version: 3.0.0
 main: fr.mpieuvre.repeat.Main
 api-version: '1.21'
 author: Mpieuvre
-description: Configurable automatic message plugin with rotation, placeholders and delivery modes.
+description: Automatic rotating messages in chat, action bar or boss bar.
 commands:
+  repeat:
+    description: Main Repeat command.
+    usage: /repeat help
+    aliases: [rpt]
+    permission: repeat.admin
   setmessage:
     description: Sets the automatic message.
-    usage: /setmessage <message> OR /setmessage <index> <message>
+    usage: /repeat set <message>
     permission: repeat.admin
   addmessages:
     description: Adds a message to the automatic rotation.
-    usage: /addmessages <message>
+    usage: /repeat add <message>
     aliases: [addmessage]
     permission: repeat.admin
   removemessage:
     description: Removes a message from the rotation.
-    usage: /removemessage <index>
+    usage: /repeat remove <index>
     permission: repeat.admin
   clearmessages:
     description: Deletes all configured messages.
-    usage: /clearmessages confirm
+    usage: /repeat clear confirm
     permission: repeat.admin
   movemessage:
     description: Moves a message to another position in the rotation.
-    usage: /movemessage <from> <to>
+    usage: /repeat move <from> <to>
     permission: repeat.admin
   testmessage:
     description: Sends the next scheduled message only to you.
-    usage: /testmessage
+    usage: /repeat test
     permission: repeat.admin
   testemessages:
     description: Sends one specific saved message to you.
-    usage: /testemessages <index>
+    usage: /repeat test <index>
     permission: repeat.admin
   listemessage:
     description: Lists all saved messages with indexes.
-    usage: /listemessage
+    usage: /repeat list
     permission: repeat.admin
   repeatreload:
     description: Reloads Repeat configuration from file.
-    usage: /repeatreload
+    usage: /repeat reload
     permission: repeat.admin
   togglemessage:
     description: Enables or disables automatic messages.
-    usage: /togglemessage
+    usage: /repeat toggle
     permission: repeat.admin
   setinterval:
     description: Sets the interval for all messages, or for one specific message.
-    usage: /setinterval <seconds> OR /setinterval <index> <seconds>
+    usage: /repeat interval <seconds>
     permission: repeat.admin
   setdelivery:
     description: Sets the delivery mode for all messages or one message.
-    usage: /setdelivery <chat|actionbar> OR /setdelivery <index> <chat|actionbar>
+    usage: /repeat delivery <chat|actionbar|bossbar>
     permission: repeat.admin
   setworlds:
     description: Limits message delivery to specific worlds.
-    usage: /setworlds all OR /setworlds <world1,world2,...>
+    usage: /repeat worlds all
     permission: repeat.admin
   setminplayers:
     description: Sets the minimum online players required to broadcast.
-    usage: /setminplayers <count>
+    usage: /repeat minplayers <count>
+    permission: repeat.admin
+  setbossbar:
+    description: Configures bossbar message, color, style, duration and progress.
+    usage: /repeat bossbar message <texte>
     permission: repeat.admin
   repeatstatus:
     description: Shows the current Repeat plugin status.
-    usage: /repeatstatus
+    usage: /repeat status
     permission: repeat.admin
   repeathelp:
     description: Shows Repeat help.
-    usage: /repeathelp
+    usage: /repeat help
     permission: repeat.admin
 permissions:
   repeat.admin:
