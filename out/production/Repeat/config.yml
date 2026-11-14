@@ -1,4 +1,4 @@
-# Repeat 3.0 - configuration
+# Repeat 3.1 - configuration
 #
 # Color codes:
 # - Standard: &0..&9, &a..&f
@@ -13,20 +13,22 @@
 # - {server}  server name
 #
 # Delivery modes:
-# - chat
-# - action_bar
-# - boss_bar
+# - chat         normal chat line
+# - action_bar   text above the hotbar
+# - boss_bar     bar at the TOP of the screen (like Wither / Dragon / Raid)
 #
-# Bossbar:
-# - The bar stays on screen and empties over durationSeconds.
-# - When it is empty, Repeat switches to the next bossbar message.
-# - If there is only one bossbar message, it loops forever and the progress restarts.
+# Boss bar:
+# - Used only to display a message at the top of the screen.
+# - The bar stays visible, empties, then Repeat switches to the next boss-bar message.
+# - If there is only one, it loops and the progress restarts.
 # - color: pink, blue, red, green, yellow, purple, white
 # - style: solid, segmented_6, segmented_10, segmented_12, segmented_20
 # - durationSeconds: time to empty the bar before the next message
 #
-# Commands:
-# - /repeat help
+# In-game:
+#   /repeat help
+#   /repeat add bossbar &eYour message
+#   /repeat demo wither
 
 enabled: true
 
@@ -46,15 +48,15 @@ entries:
   - message: "&6[Repeat] &fUse &e/repeathelp &ffor help and to configure the plugin."
     intervalSeconds: 300
     delivery: chat
+  # Action bar example:
   # - message: "&a{online}/{max} players online &7- &fWelcome {player}!"
   #   intervalSeconds: 120
   #   delivery: action_bar
-  #   worlds: [world]
-  # - message: "&eServer restart in 10 minutes"
-  #   intervalSeconds: 180
+  #
+  # Boss bar example (message at the top of the screen):
+  # - message: "&eShop reset in 10 minutes"
   #   delivery: boss_bar
   #   bossbar:
   #     color: yellow
   #     style: solid
-  #     durationSeconds: 8
-  #     progress: 1.0
+  #     durationSeconds: 15

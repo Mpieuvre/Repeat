@@ -26,6 +26,7 @@ public final class BossBarManager implements Listener {
 
     private final Main plugin;
     private final Map<UUID, ActiveBar> activeBars = new ConcurrentHashMap<>();
+    private final Map<UUID, DemoBar> demoBars = new ConcurrentHashMap<>();
     private BukkitTask ticker;
     private int currentIndex;
     private long elapsedTicks;
@@ -44,8 +45,43 @@ public final class BossBarManager implements Listener {
     public void stop() {
         stopTicker();
         hideAll();
+        clearAllDemos();
         currentIndex = 0;
         elapsedTicks = 0;
+    }
+
+    public void showDemo(Player player, BossBarPreset preset) {
+        if (player == null || preset == null) {
+            return;
+        }
+        clearDemo(player);
+
+        NamespacedKey key = new NamespacedKey(plugin, "demo-" + player.getUniqueId());
+        removeRegisteredBar(key);
+
+        String title = TextUtils.colorize(preset.title());
+        BossBarSettings settings = preset.toSettings();
+        BossBar bar = createBar(key, title, settings.getColor(), settings.getStyle());
+        bar.setProgress(1.0D);
+        bar.addPlayer(player);
+        bar.setVisible(true);
+
+        DemoBar demoBar = new DemoBar(bar, key);
+        long totalTicks = Math.max(40L, settings.getDurationSeconds() * 20L);
+        demoBar.task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (!player.isOnline()) {
+                clearDemo(player);
+                return;
+            }
+            demoBar.elapsed += TICK_PERIOD;
+            if (demoBar.elapsed >= totalTicks) {
+                clearDemo(player);
+                return;
+            }
+            double progress = 1.0D - (demoBar.elapsed / (double) totalTicks);
+            bar.setProgress(clamp(progress));
+        }, TICK_PERIOD, TICK_PERIOD);
+        demoBars.put(player.getUniqueId(), demoBar);
     }
 
     public void jumpTo(MessageEntry target) {
@@ -175,6 +211,45 @@ public final class BossBarManager implements Listener {
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         hide(event.getPlayer());
+        clearDemo(event.getPlayer());
+    }
+
+    private void clearDemo(Player player) {
+        if (player == null) {
+            return;
+        }
+        DemoBar demoBar = demoBars.remove(player.getUniqueId());
+        if (demoBar == null) {
+            return;
+        }
+        if (demoBar.task != null) {
+            demoBar.task.cancel();
+        }
+        if (demoBar.bar != null) {
+            demoBar.bar.removeAll();
+            demoBar.bar.setVisible(false);
+        }
+        if (demoBar.key != null) {
+            removeRegisteredBar(demoBar.key);
+        }
+    }
+
+    private void clearAllDemos() {
+        for (UUID playerId : new ArrayList<>(demoBars.keySet())) {
+            clearDemo(Bukkit.getPlayer(playerId));
+            DemoBar leftover = demoBars.remove(playerId);
+            if (leftover != null) {
+                if (leftover.task != null) {
+                    leftover.task.cancel();
+                }
+                if (leftover.bar != null) {
+                    leftover.bar.removeAll();
+                }
+                if (leftover.key != null) {
+                    removeRegisteredBar(leftover.key);
+                }
+            }
+        }
     }
 
     private void clear(UUID playerId, Player player) {
@@ -241,6 +316,18 @@ public final class BossBarManager implements Listener {
         private BossBar bukkitBar;
         private NamespacedKey barKey;
         private Object adventureBar;
+    }
+
+    private static final class DemoBar {
+        private final BossBar bar;
+        private final NamespacedKey key;
+        private BukkitTask task;
+        private long elapsed;
+
+        private DemoBar(BossBar bar, NamespacedKey key) {
+            this.bar = bar;
+            this.key = key;
+        }
     }
 
     private static final class AdventureBossBars {

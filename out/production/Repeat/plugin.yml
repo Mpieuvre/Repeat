@@ -1,5 +1,5 @@
 name: Repeat
-version: 3.0.0
+version: 3.1.0
 main: fr.mpieuvre.repeat.Main
 api-version: '1.21'
 author: Mpieuvre
@@ -76,7 +76,7 @@ commands:
     usage: /repeat status
     permission: repeat.admin
   repeathelp:
-    description: Shows Repeat help.
+    description: Getting started with Repeat (chat, action bar, Minecraft boss bars).
     usage: /repeat help
     permission: repeat.admin
 permissions:

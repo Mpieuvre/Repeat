@@ -20,14 +20,17 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
     private static final String PREFIX = TextUtils.colorize("&6[Repeat] &r");
     private static final String SEP = TextUtils.colorize("&8--------------------------------");
     private static final List<String> SUBCOMMANDS = List.of(
-            "help", "status", "reload", "toggle", "list",
+            "help", "examples", "demo", "commands", "status", "reload", "toggle", "list",
             "add", "set", "remove", "clear", "move", "test",
             "interval", "delivery", "worlds", "minplayers", "bossbar"
     );
     private static final List<String> DELIVERY_MODES = List.of("chat", "actionbar", "bossbar");
-    private static final List<String> BOSSBAR_PROPERTIES = List.of("message", "color", "style", "duration", "progress");
+    private static final List<String> BOSSBAR_PROPERTIES = List.of(
+            "message", "preset", "color", "style", "duration"
+    );
     private static final List<String> BOSSBAR_COLORS = List.of("pink", "blue", "red", "green", "yellow", "purple", "white");
     private static final List<String> BOSSBAR_STYLES = List.of("solid", "segmented_6", "segmented_10", "segmented_12", "segmented_20");
+    private static final List<String> BOSSBAR_PRESETS = List.of("wither", "dragon", "raid");
 
     private final Main plugin;
 
@@ -45,7 +48,7 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
         String commandName = command.getName().toLowerCase(Locale.ROOT);
         if ("repeat".equals(commandName)) {
             if (args.length == 0) {
-                return handleHelp(sender);
+                return handleGettingStarted(sender);
             }
             return dispatch(sender, args[0].toLowerCase(Locale.ROOT), Arrays.copyOfRange(args, 1, args.length));
         }
@@ -69,7 +72,18 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
             case "minplayers", "setminplayers" -> handleSetMinPlayers(sender, args);
             case "bossbar", "setbossbar" -> handleSetBossBar(sender, args);
             case "status", "repeatstatus" -> handleStatus(sender);
-            case "help", "repeathelp" -> handleHelp(sender);
+            case "examples", "example" -> handleExamples(sender);
+            case "demo" -> handleDemo(sender, args);
+            case "commands" -> handleCommands(sender);
+            case "help", "repeathelp" -> {
+                if (args.length >= 1 && "commands".equalsIgnoreCase(args[0])) {
+                    yield handleCommands(sender);
+                }
+                if (args.length >= 1 && ("examples".equalsIgnoreCase(args[0]) || "example".equalsIgnoreCase(args[0]))) {
+                    yield handleExamples(sender);
+                }
+                yield handleGettingStarted(sender);
+            }
             default -> {
                 send(sender, "&cUnknown subcommand. Use &f/repeat help&c.");
                 yield true;
@@ -128,11 +142,37 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
         if (args.length == 0) {
             send(sender, "&cUsage: &f/repeat add <message>");
             send(sender, "&7Or: &f/repeat add bossbar <message>");
+            send(sender, "&7Or: &f/repeat add bossbar <wither|dragon|raid> [message]");
+            return true;
+        }
+
+        BossBarPreset shorthandPreset = BossBarPreset.fromString(args[0]);
+        if (shorthandPreset != null) {
+            String message = args.length == 1 ? shorthandPreset.title() : join(args, 1);
+            plugin.addMessage(message, DeliveryMode.BOSS_BAR, shorthandPreset.toSettings());
+            plugin.savePluginData();
+            send(sender, "&aMinecraft &f" + shorthandPreset.displayName() + " &aboss bar added as &f#"
+                    + plugin.getMessageCount() + "&a.");
+            send(sender, "&7Look at the &ftop of the screen&7.");
+            plugin.preview(sender, plugin.getLiveEntryAt(plugin.getMessageCount() - 1));
             return true;
         }
 
         if (args.length >= 2 && DeliveryMode.isKnown(args[0])) {
             DeliveryMode mode = DeliveryMode.fromString(args[0]);
+            if (mode == DeliveryMode.BOSS_BAR) {
+                BossBarPreset preset = BossBarPreset.fromString(args[1]);
+                if (preset != null) {
+                    String message = args.length == 2 ? preset.title() : join(args, 2);
+                    plugin.addMessage(message, DeliveryMode.BOSS_BAR, preset.toSettings());
+                    plugin.savePluginData();
+                    send(sender, "&aMinecraft &f" + preset.displayName() + " &aboss bar added as &f#"
+                            + plugin.getMessageCount() + "&a.");
+                    send(sender, "&7Look at the &ftop of the screen&7. Try &f/repeat demo " + preset.name().toLowerCase(Locale.ROOT));
+                    plugin.preview(sender, plugin.getLiveEntryAt(plugin.getMessageCount() - 1));
+                    return true;
+                }
+            }
             plugin.addMessage(join(args, 1), mode);
             plugin.savePluginData();
             send(sender, "&aMessage added as &f" + MessageEntry.formatDelivery(mode)
@@ -412,6 +452,26 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if ("preset".equalsIgnoreCase(args[0]) || "example".equalsIgnoreCase(args[0])) {
+            if (args.length < 2) {
+                send(sender, "&cUsage: &f/repeat bossbar preset <wither|dragon|raid>");
+                return true;
+            }
+            return applyPreset(sender, null, args[1]);
+        }
+
+        if (isInteger(args[0]) && args.length >= 2 && ("preset".equalsIgnoreCase(args[1]) || "example".equalsIgnoreCase(args[1]))) {
+            Integer oneBasedIndex = parseIndexArg(sender, args[0]);
+            if (oneBasedIndex == null || !isValidIndex(sender, oneBasedIndex)) {
+                return true;
+            }
+            if (args.length < 3) {
+                send(sender, "&cUsage: &f/repeat bossbar <index> preset <wither|dragon|raid>");
+                return true;
+            }
+            return applyPreset(sender, oneBasedIndex, args[2]);
+        }
+
         if (isBossBarMessageProperty(args[0])) {
             if (args.length < 2) {
                 send(sender, "&cUsage: &f/repeat bossbar message <texte>");
@@ -481,6 +541,43 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean applyPreset(CommandSender sender, Integer oneBasedIndex, String value) {
+        BossBarPreset preset = BossBarPreset.fromString(value);
+        if (preset == null) {
+            send(sender, "&cUnknown Minecraft preset. Use: &fwither&c, &fdragon&c, &fraid&c.");
+            return true;
+        }
+
+        if (oneBasedIndex == null) {
+            int applied = 0;
+            for (int i = 0; i < plugin.getMessageCount(); i++) {
+                if (plugin.getLiveEntryAt(i).getDeliveryMode() == DeliveryMode.BOSS_BAR) {
+                    plugin.applyBossBarPreset(i, preset);
+                    applied++;
+                }
+            }
+            if (applied == 0) {
+                plugin.addMessage(preset.title(), DeliveryMode.BOSS_BAR, preset.toSettings());
+                plugin.savePluginData();
+                send(sender, "&aAdded a vanilla &f" + preset.displayName() + " &aboss bar (&f#"
+                        + plugin.getMessageCount() + "&a).");
+                send(sender, "&7Look at the &ftop of the screen&7, like a real Minecraft boss.");
+                plugin.preview(sender, plugin.getLiveEntryAt(plugin.getMessageCount() - 1));
+                return true;
+            }
+            plugin.savePluginData();
+            send(sender, "&aApplied the vanilla &f" + preset.displayName() + " &abar to &f" + applied + " &abossbar message(s).");
+            return true;
+        }
+
+        plugin.applyBossBarPreset(oneBasedIndex - 1, preset);
+        plugin.savePluginData();
+        send(sender, "&aMessage &f#" + oneBasedIndex + " &anow uses the vanilla &f" + preset.displayName() + " &aboss bar.");
+        send(sender, "&7Look at the &ftop of the screen&7.");
+        plugin.preview(sender, plugin.getLiveEntryAt(oneBasedIndex - 1));
+        return true;
+    }
+
     private boolean isBossBarMessageProperty(String value) {
         String normalized = value.trim().toLowerCase(Locale.ROOT);
         return "message".equals(normalized) || "msg".equals(normalized) || "text".equals(normalized);
@@ -504,6 +601,14 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
                     yield null;
                 }
                 yield settings -> settings.setStyle(style);
+            }
+            case "preset" -> {
+                BossBarPreset preset = BossBarPreset.fromString(value);
+                if (preset == null) {
+                    send(sender, "&cUnknown preset. Use: &f" + String.join(", ", BOSSBAR_PRESETS));
+                    yield null;
+                }
+                yield preset::apply;
             }
             case "duration" -> {
                 int seconds;
@@ -534,7 +639,7 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
                 yield settings -> settings.setProgress(percent / 100.0D);
             }
             default -> {
-                send(sender, "&cUnknown bossbar property. Use &fmessage&c, &fcolor&c, &fstyle&c, &fduration &cor &fprogress&c.");
+                send(sender, "&cUnknown bossbar option. Use &f/repeat examples &cfor Minecraft presets.");
                 yield null;
             }
         };
@@ -572,12 +677,12 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendBossBarUsage(CommandSender sender) {
-        send(sender, "&cUsage: &f/repeat bossbar message <texte>");
-        send(sender, "&7Or: &f/repeat bossbar <index> message <texte>");
-        send(sender, "&7Or: &f/repeat bossbar [index] <color|style|duration> <value>");
-        send(sender, "&7Colors: &f" + String.join(", ", BOSSBAR_COLORS));
-        send(sender, "&7Styles: &f" + String.join(", ", BOSSBAR_STYLES));
-        send(sender, "&7Duration: &fseconds &7(time for the bar to empty, then next message)");
+        send(sender, "&eBoss bar &7- message at the top of the screen");
+        send(sender, "&f/repeat add bossbar &eYour message");
+        send(sender, "&f/repeat bossbar message <text> &7- Set the title");
+        send(sender, "&f/repeat bossbar color <color> &7- Bar color");
+        send(sender, "&f/repeat bossbar duration <seconds> &7- Time to empty");
+        send(sender, "&7Try: &f/repeat demo wither");
     }
 
     private boolean handleStatus(CommandSender sender) {
@@ -593,13 +698,80 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private boolean handleHelp(CommandSender sender) {
-        send(sender, "&eHelp");
-        send(sender, "&7Colors: &f&a &7&f&l &7&f&r &7hex &f&#RRGGBB");
+    private boolean handleGettingStarted(CommandSender sender) {
+        send(sender, "&eHow Repeat works");
+        send(sender, "&7Automatic messages in &fchat&7, the &faction bar&7, or a &fMinecraft boss bar&7.");
+        sender.sendMessage(SEP);
+        send(sender, "&6What is a boss bar?");
+        send(sender, "&7The long bar at the &ftop of the screen&7, used to show a message.");
+        send(sender, "&7It stays visible, the bar empties, then the next message starts.");
+        sender.sendMessage(SEP);
+        send(sender, "&6Quick start");
+        send(sender, "&f1. /repeat demo wither &7- see a real Wither bar now");
+        send(sender, "&f2. /repeat add bossbar wither &7- add it to the rotation");
+        send(sender, "&f3. /repeat add &aWelcome {player}! &7- add a chat message");
+        send(sender, "&f4. /repeat list &7- see your messages");
+        send(sender, "&f5. /repeat test 2 &7- preview one message");
+        sender.sendMessage(SEP);
+        send(sender, "&6More");
+        send(sender, "&f/repeat examples &7- Wither / Dragon / Raid recipes");
+        send(sender, "&f/repeat commands &7- full command list");
+        send(sender, "&f/repeat status &7- plugin status");
+        return true;
+    }
+
+    private boolean handleExamples(CommandSender sender) {
+        send(sender, "&eBoss bar examples");
+        send(sender, "&7Messages at the &ftop of the screen&7. Colors match vanilla bars.");
+        sender.sendMessage(SEP);
+        send(sender, "&5Purple bar &7(like the Wither)");
+        send(sender, "&f/repeat demo wither");
+        send(sender, "&f/repeat add bossbar wither &5Your message here");
+        sender.sendMessage(SEP);
+        send(sender, "&dPink bar &7(like the Ender Dragon)");
+        send(sender, "&f/repeat demo dragon");
+        send(sender, "&f/repeat add bossbar dragon &dYour message here");
+        sender.sendMessage(SEP);
+        send(sender, "&cRed notched bar &7(like a Raid)");
+        send(sender, "&f/repeat demo raid");
+        send(sender, "&f/repeat add bossbar raid &cYour message here");
+        sender.sendMessage(SEP);
+        send(sender, "&6Custom");
+        send(sender, "&f/repeat add bossbar &eShop reset in 10 minutes");
+        send(sender, "&f/repeat bossbar color yellow");
+        send(sender, "&f/repeat bossbar duration 20");
+        return true;
+    }
+
+    private boolean handleDemo(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            send(sender, "&cYou must be in-game to preview a boss bar.");
+            return true;
+        }
+        if (args.length != 1) {
+            send(sender, "&cUsage: &f/repeat demo <wither|dragon|raid>");
+            send(sender, "&7Look at the &ftop of the screen&7 after running it.");
+            return true;
+        }
+        BossBarPreset preset = BossBarPreset.fromString(args[0]);
+        if (preset == null) {
+            send(sender, "&cUnknown preset. Use: &fwither&c, &fdragon&c, &fraid&c.");
+            return true;
+        }
+        plugin.showBossBarDemo(player, preset);
+        send(sender, "&aShowing a &f" + preset.displayName() + " &aboss bar.");
+        send(sender, "&7Look at the &ftop of the screen&7.");
+        return true;
+    }
+
+    private boolean handleCommands(CommandSender sender) {
+        send(sender, "&eAll commands");
+        send(sender, "&7Colors: &fa &7bold &fl &7reset &fr &7hex &f&#RRGGBB");
         send(sender, "&7Placeholders: &f{online} {max} {player} {world} {server}");
         sender.sendMessage(SEP);
         send(sender, "&6Messages");
-        send(sender, "&f/repeat add [chat|actionbar|bossbar] <message> &7- Add a message");
+        send(sender, "&f/repeat add [chat|actionbar|bossbar] <message>");
+        send(sender, "&f/repeat add bossbar <wither|dragon|raid> [message]");
         send(sender, "&f/repeat set [index] <message> &7- Edit a message");
         send(sender, "&f/repeat remove <index> &7- Remove a message");
         send(sender, "&f/repeat move <from> <to> &7- Reorder messages");
@@ -609,21 +781,22 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(SEP);
         send(sender, "&6Broadcast");
         send(sender, "&f/repeat toggle &7- Enable or disable auto messages");
-        send(sender, "&f/repeat interval [index] <seconds> &7- Set delay");
-        send(sender, "&f/repeat delivery [index] <chat|actionbar|bossbar> &7- Set display");
+        send(sender, "&f/repeat interval [index] <seconds> &7- Chat/actionbar delay");
+        send(sender, "&f/repeat delivery [index] <chat|actionbar|bossbar>");
         send(sender, "&f/repeat worlds [index] <all|worlds> &7- Limit worlds");
-        send(sender, "&f/repeat minplayers <count> &7- Minimum online players");
+        send(sender, "&f/repeat minplayers <count>");
         sender.sendMessage(SEP);
-        send(sender, "&6Bossbar");
-        send(sender, "&f/repeat bossbar [index] message <texte> &7- Set bossbar text");
-        send(sender, "&f/repeat bossbar [index] color <color> &7- Bar color");
-        send(sender, "&f/repeat bossbar [index] style <style> &7- Bar style");
-        send(sender, "&f/repeat bossbar [index] duration <seconds> &7- Time to empty the bar");
+        send(sender, "&6Boss bar");
+        send(sender, "&f/repeat demo <wither|dragon|raid> &7- Try a vanilla bar");
+        send(sender, "&f/repeat bossbar preset <wither|dragon|raid>");
+        send(sender, "&f/repeat bossbar [index] message <text>");
+        send(sender, "&f/repeat bossbar [index] color|style|duration <value>");
         sender.sendMessage(SEP);
         send(sender, "&6Admin");
-        send(sender, "&f/repeat status &7- Show plugin status");
+        send(sender, "&f/repeat status &7- Plugin status");
         send(sender, "&f/repeat reload &7- Reload config.yml");
-        send(sender, "&f/repeat help &7- Show this help");
+        send(sender, "&f/repeat examples &7- Minecraft recipes");
+        send(sender, "&f/repeat help &7- Getting started");
         return true;
     }
 
@@ -649,7 +822,11 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
             case "delivery" -> tabCompleteIndexed(args, DELIVERY_MODES);
             case "worlds" -> tabCompleteWorlds(args);
             case "bossbar" -> tabCompleteBossBar(args);
-            case "add" -> args.length == 1 ? filterByPrefix(DELIVERY_MODES, args[0]) : Collections.emptyList();
+            case "demo" -> args.length == 1 ? filterByPrefix(BOSSBAR_PRESETS, args[0]) : Collections.emptyList();
+            case "help" -> args.length == 1
+                    ? filterByPrefix(List.of("commands", "examples"), args[0])
+                    : Collections.emptyList();
+            case "add" -> tabCompleteAdd(args);
             case "clear" -> args.length == 1 ? filterByPrefix(List.of("confirm"), args[0]) : Collections.emptyList();
             case "set", "remove", "test" -> args.length == 1 ? tabCompleteIndexes(args) : Collections.emptyList();
             case "move" -> (args.length == 1 || args.length == 2) ? tabCompleteIndexes(args) : Collections.emptyList();
@@ -681,6 +858,18 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
         return tabCompleteIndexed(args, worlds);
     }
 
+    private List<String> tabCompleteAdd(String[] args) {
+        if (args.length == 1) {
+            List<String> suggestions = new ArrayList<>(DELIVERY_MODES);
+            suggestions.addAll(BOSSBAR_PRESETS);
+            return filterByPrefix(suggestions, args[0]);
+        }
+        if (args.length == 2 && "bossbar".equalsIgnoreCase(args[0])) {
+            return filterByPrefix(BOSSBAR_PRESETS, args[1]);
+        }
+        return Collections.emptyList();
+    }
+
     private List<String> tabCompleteBossBar(String[] args) {
         if (args.length == 1) {
             List<String> suggestions = new ArrayList<>(BOSSBAR_PROPERTIES);
@@ -708,8 +897,8 @@ public class RepeatCommand implements CommandExecutor, TabCompleter {
         return switch (property.toLowerCase(Locale.ROOT)) {
             case "color" -> BOSSBAR_COLORS;
             case "style" -> BOSSBAR_STYLES;
-            case "duration" -> List.of("0", "3", "5", "8", "10");
-            case "progress" -> List.of("25", "50", "75", "100");
+            case "duration" -> List.of("8", "10", "12", "15", "20");
+            case "preset" -> BOSSBAR_PRESETS;
             default -> Collections.emptyList();
         };
     }

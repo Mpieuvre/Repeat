@@ -359,9 +359,28 @@ public class Main extends JavaPlugin {
     }
 
     public void addMessage(String message, DeliveryMode deliveryMode) {
-        MessageEntry entry = new MessageEntry(message.trim(), defaultIntervalSeconds);
-        entry.setDeliveryMode(deliveryMode);
+        addMessage(message, deliveryMode, null);
+    }
+
+    public void addMessage(String message, DeliveryMode deliveryMode, BossBarSettings bossBarSettings) {
+        MessageEntry entry = new MessageEntry(
+                message.trim(),
+                defaultIntervalSeconds,
+                deliveryMode,
+                List.of(),
+                bossBarSettings == null ? new BossBarSettings() : bossBarSettings
+        );
         entries.add(entry);
+    }
+
+    public void applyBossBarPreset(int index, BossBarPreset preset) {
+        MessageEntry entry = entries.get(index);
+        entry.setDeliveryMode(DeliveryMode.BOSS_BAR);
+        preset.apply(entry.getBossBarSettings());
+    }
+
+    public void showBossBarDemo(Player player, BossBarPreset preset) {
+        bossBarManager.showDemo(player, preset);
     }
 
     public boolean removeMessageAt(int index) {

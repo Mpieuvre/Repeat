@@ -167,13 +167,12 @@ public final class BossBarSettings {
     }
 
     public String summary() {
-        return formatColor(color)
-                + " / "
-                + formatStyle(style)
-                + " / "
-                + durationSeconds + "s"
-                + " / "
-                + getProgressPercent() + "%";
+        String text = formatColor(color) + " / " + formatStyle(style) + " / " + durationSeconds + "s";
+        BossBarPreset preset = BossBarPreset.match(this);
+        if (preset != null) {
+            text += " / like " + preset.displayName();
+        }
+        return text;
     }
 
     private static double normalizeProgressValue(double value) {
